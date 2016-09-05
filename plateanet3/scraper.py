@@ -1,5 +1,7 @@
+import signal
 import asyncio
 import aiohttp
+import sys
 
 from collections import defaultdict
 from bs4 import BeautifulSoup
@@ -160,9 +162,22 @@ async def get_sectores_y_descuentos(id_funcion, client):
 def run_loop():
     loop = asyncio.get_event_loop()
     client = aiohttp.ClientSession(loop=loop)
-    content = loop.run_until_complete(get_obras_con_promocion(client))
-    print(content)
+
+    def signal_handler(signal, frame):
+        loop.stop()
+        client.close()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+
+    obras = loop.run_until_complete(get_obras_en_cartel(client))
+    print(obras)
+
+    tasks = [asyncio.ensure_future(get_promociones_obra(obra_id, client)) for obra_id in obras]
+    loop.run_until_complete(asyncio.wait(tasks))
+
     client.close()
+    print("Client closed")
 
 if __name__ == '__main__':
     run_loop()
